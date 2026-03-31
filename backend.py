@@ -44,7 +44,8 @@ load_memory()
 
 # --- Hugging Face Transformer Bridge ---
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "") 
-API_URL = "https://router.huggingface.co/hf-inference/models/distilgpt2"
+# UPGRADED URL: Now points to the modern Chat Completions endpoint using Zephyr!
+API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta/v1/chat/completions"
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
 def query_transformer(payload):
@@ -86,18 +87,34 @@ def chat_with_dumbo(msg: Message):
         }
 
     # 3. Bridge over to the Transformer Supercomputer!
-    transformer_reply = query_transformer({"inputs": msg.text})
+    # UPGRADED PAYLOAD: Uses the "messages" format to give Dumbo his true identity
+    payload = {
+        "model": "HuggingFaceH4/zephyr-7b-beta",
+        "messages": [
+            {
+                "role": "system", 
+                "content": "You are Dumbo, a helpful AI. You are called Dumbo because your previous versions (V1 and V2) were dumb. You are NOT an elephant. Keep answers brief (1-2 sentences)."
+            },
+            {
+                "role": "user", 
+                "content": msg.text
+            }
+        ],
+        "max_tokens": 60
+    }
+    
+    transformer_reply = query_transformer(payload)
     
     if transformer_reply:
-        # Check if the AI generated text successfully
-        if isinstance(transformer_reply, list) and len(transformer_reply) > 0 and 'generated_text' in transformer_reply[0]:
-            clean_text = transformer_reply[0]['generated_text'].replace('\n', ' ').strip()
+        # UPGRADED PARSING: Extracts the response from the Chat format
+        if 'choices' in transformer_reply and len(transformer_reply['choices']) > 0:
+            clean_text = transformer_reply['choices'][0]['message']['content'].strip()
             return {
                 "response": clean_text,
-                "source": "Hugging Face Transformer"
+                "source": "Zephyr-7B Brain"
             }
-        # THIS IS NEW: It will now tell you EXACTLY what failed!
-        elif isinstance(transformer_reply, dict) and 'error' in transformer_reply:
+        # It will now tell you EXACTLY what failed!
+        elif 'error' in transformer_reply:
             return {
                 "response": f"Diagnostic Report: '{transformer_reply['error']}'",
                 "source": "Hugging Face Diagnostic"
