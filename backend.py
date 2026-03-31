@@ -44,7 +44,8 @@ load_memory()
 
 # --- Hugging Face Transformer Bridge ---
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "") 
-API_URL = "https://api-inference.huggingface.co/models/distilgpt2"
+# NEW UPDATED ROUTER LINK BELOW:
+API_URL = "https://router.huggingface.co/hf-inference/models/distilgpt2"
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
 def query_transformer(payload):
