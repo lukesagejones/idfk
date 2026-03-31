@@ -44,16 +44,22 @@ load_memory()
 
 # --- Hugging Face Transformer Bridge ---
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "") 
-# NEW UPDATED ROUTER LINK BELOW:
 API_URL = "https://router.huggingface.co/hf-inference/models/distilgpt2"
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
 def query_transformer(payload):
     try:
         response = requests.post(API_URL, headers=headers, json=payload, timeout=15)
-        return response.json()
+        
+        # If Hugging Face returns weird text instead of JSON, catch it!
+        try:
+            return response.json()
+        except ValueError:
+            return {"error": f"Hugging Face returned weird data: {response.status_code} - {response.text[:100]}"}
+            
     except Exception as e:
-        return None
+        # Catch severe server crashes like timeouts
+        return {"error": f"Python Server Crash: {str(e)}"}
 
 # --- API Endpoints ---
 @app.get("/")
@@ -90,16 +96,16 @@ def chat_with_dumbo(msg: Message):
                 "response": clean_text,
                 "source": "Hugging Face Transformer"
             }
-        # Check if Hugging Face is telling us the model is asleep/loading
+        # THIS IS NEW: It will now tell you EXACTLY what failed!
         elif isinstance(transformer_reply, dict) and 'error' in transformer_reply:
             return {
-                "response": f"My Transformer brain is waking up! Hugging Face says: '{transformer_reply['error']}'. Please wait 20 seconds and ask me again!",
-                "source": "Hugging Face (Waking Up)"
+                "response": f"Diagnostic Report: '{transformer_reply['error']}'",
+                "source": "Hugging Face Diagnostic"
             }
 
-    # 4. Fallback if Hugging Face completely errors out
+    # 4. Fallback
     return {
-        "response": f"I tried to think about '{msg.text}', but my connection to Hugging Face failed. Make sure your token is copied correctly!",
+        "response": f"I tried to think about '{msg.text}', but my connection failed completely.",
         "source": "Python Bridge Server Error"
     }
 
