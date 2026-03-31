@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
 import os
-import requests # We use this to talk to Hugging Face!
+import requests 
 
 # Initialize the API
 app = FastAPI(title="Dumbo V2 - Cloud Bridge Edition")
@@ -43,16 +43,15 @@ def save_memory():
 load_memory()
 
 # --- Hugging Face Transformer Bridge ---
-# You can get a free token from huggingface.co to put in Render's Environment Variables later!
 HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN", "") 
 API_URL = "https://api-inference.huggingface.co/models/distilgpt2"
 headers = {"Authorization": f"Bearer {HUGGINGFACE_TOKEN}"}
 
 def query_transformer(payload):
     try:
-        response = requests.post(API_URL, headers=headers, json=payload, timeout=10)
+        response = requests.post(API_URL, headers=headers, json=payload, timeout=15)
         return response.json()
-    except:
+    except Exception as e:
         return None
 
 # --- API Endpoints ---
@@ -72,22 +71,35 @@ def chat_with_dumbo(msg: Message):
                 "source": "JSON Memory Bank"
             }
 
-    # 2. Second, bridge over to the Transformer Supercomputer!
-    if HUGGINGFACE_TOKEN:
-        transformer_reply = query_transformer({"inputs": msg.text})
-        
-        # If the transformer responds successfully
-        if transformer_reply and isinstance(transformer_reply, list) and 'generated_text' in transformer_reply[0]:
+    # 2. Check if Token Exists
+    if not HUGGINGFACE_TOKEN:
+        return {
+            "response": f"I heard '{msg.text}'. (But I am missing my Hugging Face Token in Render's Environment Variables!)",
+            "source": "Python Bridge Server"
+        }
+
+    # 3. Bridge over to the Transformer Supercomputer!
+    transformer_reply = query_transformer({"inputs": msg.text})
+    
+    if transformer_reply:
+        # Check if the AI generated text successfully
+        if isinstance(transformer_reply, list) and len(transformer_reply) > 0 and 'generated_text' in transformer_reply[0]:
             clean_text = transformer_reply[0]['generated_text'].replace('\n', ' ').strip()
             return {
                 "response": clean_text,
                 "source": "Hugging Face Transformer"
             }
+        # Check if Hugging Face is telling us the model is asleep/loading
+        elif isinstance(transformer_reply, dict) and 'error' in transformer_reply:
+            return {
+                "response": f"My Transformer brain is waking up! Hugging Face says: '{transformer_reply['error']}'. Please wait 20 seconds and ask me again!",
+                "source": "Hugging Face (Waking Up)"
+            }
 
-    # 3. Fallback (If no token is provided or Hugging Face is asleep)
+    # 4. Fallback if Hugging Face completely errors out
     return {
-        "response": f"I heard '{msg.text}'. (My Transformer brain needs a Hugging Face Token to generate text!)",
-        "source": "Python Bridge Server"
+        "response": f"I tried to think about '{msg.text}', but my connection to Hugging Face failed. Make sure your token is copied correctly!",
+        "source": "Python Bridge Server Error"
     }
 
 @app.post("/learn")
